@@ -74,7 +74,7 @@ export class TodosService {
   async getAllTodos(id: number) {
     return this.repoService.find({
       where: { fromUser: id },
-      select: ['id', 'content'],
+      select: ['id', 'content', 'position'],
       order: {
         position: 'ASC',
       },
@@ -120,29 +120,28 @@ export class TodosService {
     updateTodoDto: UpdateTodoDto,
   ): Promise<Todo[]> {
     const { id, position } = updateTodoDto;
-    const todos = await this.repoService.find({ where: { fromUser: userId } });
-    console.log('extracted todos', todos);
+    const todos = await this.repoService.find({
+      where: { fromUser: userId },
+      order: { position: 'ASC' },
+    });
+    const positions = todos.map((todo) => todo.position);
+    const isPositionExists = positions.includes(position);
+    if (!isPositionExists) {
+      throw new BadRequestException('The position is invalid');
+    }
     const todoToDrag = todos.find((todo) => todo.id === id);
     if (!todoToDrag) {
       throw new Error('Todo not found.');
     }
-
     const updatedTodos = todos.filter((todo) => todo.id !== id);
-    console.log('To update todoss', updatedTodos);
     updatedTodos.splice(position - 1, 0, todoToDrag);
-    console.log('updated todos', updatedTodos);
 
-    const existingPositions = updatedTodos
-      .map((todo) => todo.position)
-      .sort((a, b) => a - b);
-    console.log(existingPositions);
-    const positionExists = existingPositions.includes(updateTodoDto.position);
-
-    if (!positionExists) {
-      throw new BadRequestException('Invalid position.');
-    }
     for (let i = 0; i < updatedTodos.length; i++) {
-      updatedTodos[i].position = existingPositions[i];
+      if (updatedTodos[i].id === id) {
+        updatedTodos[i].position = position;
+      } else if (updatedTodos[i].position !== i + 1) {
+        updatedTodos[i].position = i + 1;
+      }
     }
 
     await this.repoService.save(updatedTodos);
@@ -150,3 +149,16 @@ export class TodosService {
     return this.getAllTodos(userId);
   }
 }
+
+// const existingPositions = updatedTodos;
+//   .map((todo) => todo.position)
+//   .sort((a, b) => a - b);
+// console.log(existingPositions);
+// const positionExists = existingPositions.includes(updateTodoDto.position);
+
+// if (!positionExists) {
+//   throw new BadRequestException('Invalid position.');
+// }
+// for (let i = 0; i < updatedTodos.length; i++) {
+//   updatedTodos[i].position = existingPositions[i];
+// }
