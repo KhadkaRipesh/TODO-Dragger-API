@@ -1,7 +1,16 @@
-import { Body, Controller, Get, Param, Patch, Post } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Get,
+  Param,
+  Patch,
+  Post,
+  ValidationPipe,
+} from '@nestjs/common';
 import { TodosService } from './todos.service';
 import { CreateTodoDto } from './dto/create-todo.dto';
 import { UpdateTodoDto } from './dto/update-todo.dto';
+import { TodoStatus } from './dto/todo-status.enum';
 // import { Todo } from './todos.interface';
 // import { CreateTodoDto } from './dto/create-todo.dto';
 
@@ -35,7 +44,18 @@ export class TodosController {
   }
 
   @Patch(':id')
-  dragTodo(@Param('id') id: string, @Body() updatetodoDto: UpdateTodoDto) {
+  dragTodo(
+    @Param('id') id: string,
+    @Body(new ValidationPipe()) updatetodoDto: UpdateTodoDto,
+  ) {
     return this.todosService.dragTodos(+id, updatetodoDto);
+  }
+
+  @Get(':id/:status')
+  getTaskAsStatus(
+    @Param('id') id: string,
+    @Param('status') status: TodoStatus,
+  ) {
+    return this.todosService.getTaskFromStatus(+id, status);
   }
 }

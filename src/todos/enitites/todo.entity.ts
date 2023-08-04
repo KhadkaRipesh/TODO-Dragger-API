@@ -6,6 +6,7 @@ import {
   ManyToOne,
   JoinColumn,
 } from 'typeorm';
+import { TodoStatus } from '../dto/todo-status.enum';
 
 @Entity({ name: 'todos' })
 export class Todo {
@@ -17,6 +18,9 @@ export class Todo {
 
   @Column()
   position: number;
+
+  @Column({ type: 'enum', enum: TodoStatus, default: TodoStatus.Todos })
+  status: TodoStatus;
 
   @Column()
   fromUser: number;

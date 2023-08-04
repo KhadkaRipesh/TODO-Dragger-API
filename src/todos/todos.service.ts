@@ -8,6 +8,8 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { UpdateTodoDto } from './dto/update-todo.dto';
 import { UsersService } from 'src/users/users.service';
+import { TodoStatus } from './dto/todo-status.enum';
+import { todo } from 'node:test';
 
 @Injectable()
 export class TodosService {
@@ -16,46 +18,6 @@ export class TodosService {
     private userService: UsersService,
   ) {}
 
-  // doing statically
-
-  // todos: Todo[] = [
-  //   {
-  //     id: 1,
-  //     content: 'This is a task 1.',
-  //   },
-  //   {
-  //     id: 2,
-  //     content: 'This is a task 2.',
-  //   },
-  //   {
-  //     id: 3,
-  //     content: 'This is a task 3.',
-  //   },
-  //   {
-  //     id: 4,
-  //     content: 'This is a task 4.',
-  //   },
-  //   {
-  //     id: 5,
-  //     content: 'This is a task 5.',
-  //   },
-  // ];
-  // getTodos(): Todo[] {
-  //   return this.todos;
-  // }
-  // dragTodos(todoId: number, todoDrag: number): Todo[] {
-  //   const todoIndex = this.todos.findIndex((todo) => todo.id === todoId);
-  //   console.log(this.todos);
-  //   if (todoIndex < 0) {
-  //     return this.todos;
-  //   }
-  //   console.log('index to remove', todoIndex);
-  //   const [todo] = this.todos.splice(todoIndex, 1);
-  //   console.log('Removed element:', todo);
-  //   this.todos.splice(todoDrag - 1, 0, todo);
-  //   console.log(this.todos);
-  //   return this.todos;
-  // }
   async createTask(id: number, createTodoDto: CreateTodoDto) {
     const user = await this.userService.getUser(id);
     console.log('User details:', user);
@@ -70,10 +32,22 @@ export class TodosService {
 
     return this.repoService.save(newData);
   }
-
+  //  get all tasks created by a user.
   async getAllTodos(id: number) {
     return this.repoService.find({
       where: { fromUser: id },
+      select: ['id', 'content', 'position', 'status'],
+      order: {
+        position: 'ASC',
+      },
+    });
+  }
+
+  //  get all task of a user in specific status
+
+  async getTaskFromStatus(id: number, status: TodoStatus) {
+    return this.repoService.find({
+      where: { fromUser: id, status: status },
       select: ['id', 'content', 'position'],
       order: {
         position: 'ASC',
@@ -81,36 +55,18 @@ export class TodosService {
     });
   }
 
-  // flipping the tasks
-
-  // async dragTodos(todoId: number, todoDrag: number): Promise<Todo[]> {
-  //   const todoToDrag = await this.repoService.findOne({
-  //     where: { id: todoId },
+  // update status of the tasks
+  // async updateStatus(userId: number, updateTodoDto: UpdateTodoDto) {
+  //   const { id, position, status } = updateTodoDto;
+  //   const todo = await this.repoService.findOne({
+  //     where: { id: id, fromUser: userId },
   //   });
-  //   if (!todoDrag) {
-  //     throw new Error();
-  //   }
-  //   const todoToUpdate = await this.repoService.find({
-  //     where: { position: todoDrag },
-  //   });
-
-  //   let oldPosition = todoToDrag.position;
-  //   console.log('position to change: ', oldPosition);
-  //   if (todoToUpdate.length > 0) {
-  //     for (const todo of todoToUpdate) {
-  //       if (todo.id === todoToDrag.id) {
-  //         continue;
-  //       }
-  //       todo.position = oldPosition;
-  //       oldPosition = todoDrag;
-
-  //       await this.repoService.save(todo);
-  //     }
-  //     todoToDrag.position = oldPosition;
-
-  //     await this.repoService.save(todoToDrag);
-  //   }
-  //   return this.getAllTodos();
+  //   todo.status = status;
+  //   todo.position = position;
+  //   console.log(todo);
+  //   todo.status = updateTodoDto.status;
+  //   await this.repoService.save(todo);
+  //   return this.getTaskFromStatus(userId, status);
   // }
 
   //  Dragging function
@@ -119,21 +75,24 @@ export class TodosService {
     userId: number,
     updateTodoDto: UpdateTodoDto,
   ): Promise<Todo[]> {
-    const { id, position } = updateTodoDto;
+    const { id, position, status } = updateTodoDto;
     const todos = await this.repoService.find({
       where: { fromUser: userId },
       order: { position: 'ASC' },
     });
-    const positions = todos.map((todo) => todo.position);
-    const isPositionExists = positions.includes(position);
-    if (!isPositionExists) {
-      throw new BadRequestException('The position is invalid');
-    }
+
     const todoToDrag = todos.find((todo) => todo.id === id);
+
     if (!todoToDrag) {
       throw new Error('Todo not found.');
     }
-    const updatedTodos = todos.filter((todo) => todo.id !== id);
+    if (todoToDrag.status !== status) {
+      todoToDrag.status = updateTodoDto.status;
+    }
+
+    const updatedTodos = todos.filter(
+      (todo) => todo.id !== id && todo.status === status,
+    );
     updatedTodos.splice(position - 1, 0, todoToDrag);
 
     for (let i = 0; i < updatedTodos.length; i++) {
@@ -143,10 +102,9 @@ export class TodosService {
         updatedTodos[i].position = i + 1;
       }
     }
-
     await this.repoService.save(updatedTodos);
 
-    return this.getAllTodos(userId);
+    return this.getTaskFromStatus(userId, status);
   }
 }
 
@@ -161,4 +119,77 @@ export class TodosService {
 // }
 // for (let i = 0; i < updatedTodos.length; i++) {
 //   updatedTodos[i].position = existingPositions[i];
+// }
+
+// flipping the tasks
+
+// async dragTodos(todoId: number, todoDrag: number): Promise<Todo[]> {
+//   const todoToDrag = await this.repoService.findOne({
+//     where: { id: todoId },
+//   });
+//   if (!todoDrag) {
+//     throw new Error();
+//   }
+//   const todoToUpdate = await this.repoService.find({
+//     where: { position: todoDrag },
+//   });
+
+//   let oldPosition = todoToDrag.position;
+//   console.log('position to change: ', oldPosition);
+//   if (todoToUpdate.length > 0) {
+//     for (const todo of todoToUpdate) {
+//       if (todo.id === todoToDrag.id) {
+//         continue;
+//       }
+//       todo.position = oldPosition;
+//       oldPosition = todoDrag;
+
+//       await this.repoService.save(todo);
+//     }
+//     todoToDrag.position = oldPosition;
+
+//     await this.repoService.save(todoToDrag);
+//   }
+//   return this.getAllTodos();
+// }
+
+// doing statically
+
+// todos: Todo[] = [
+//   {
+//     id: 1,
+//     content: 'This is a task 1.',
+//   },
+//   {
+//     id: 2,
+//     content: 'This is a task 2.',
+//   },
+//   {
+//     id: 3,
+//     content: 'This is a task 3.',
+//   },
+//   {
+//     id: 4,
+//     content: 'This is a task 4.',
+//   },
+//   {
+//     id: 5,
+//     content: 'This is a task 5.',
+//   },
+// ];
+// getTodos(): Todo[] {
+//   return this.todos;
+// }
+// dragTodos(todoId: number, todoDrag: number): Todo[] {
+//   const todoIndex = this.todos.findIndex((todo) => todo.id === todoId);
+//   console.log(this.todos);
+//   if (todoIndex < 0) {
+//     return this.todos;
+//   }
+//   console.log('index to remove', todoIndex);
+//   const [todo] = this.todos.splice(todoIndex, 1);
+//   console.log('Removed element:', todo);
+//   this.todos.splice(todoDrag - 1, 0, todo);
+//   console.log(this.todos);
+//   return this.todos;
 // }
